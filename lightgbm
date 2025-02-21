@@ -57,7 +57,7 @@ y_pred_best = gbm.predict(X_test)
 print('The accuracy of prediction is:', accuracy_score(y_test, y_pred_best))
 
 #模型存储
-joblib.dump(gbm, 'E:/PycharmProjects/DeepLearning/model_pkl/lightgbm_best_model.pkl')
+joblib.dump(gbm, '*.pkl')
 
 '''
 # 将目标变量进行二值化
