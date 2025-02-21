@@ -1,0 +1,206 @@
+# -*- coding: utf-8 -*-            
+# @Author : Qing
+# @Time : 
+# @Use : 处理表数据
+
+import openpyxl
+import os
+from openpyxl import Workbook
+import sys
+def read_ds_sheet2(sheet):
+    """
+    :param sheet:
+    :return: 一组处理好的岩心数据
+    :由于具体描述过长且与岩性不在同一列,所以对岩心数据进行处理……
+    """
+    # 选择要获取数据的列
+    # column_to_read = ['D', 'E', 'K', 'L']
+    column_to_read = ['D', 'E', 'K']
+    # 获取列的最大行数
+    max_row = sheet.max_row
+    # 获取列的数据
+    columns_data = {}
+    for column in column_to_read:
+        column_data = []
+        for row in range(1, max_row + 1):
+            cell_value = sheet[column + str(row)].value
+            column_data.append(cell_value)
+        '''
+        if (column == 'L'):
+            """
+                当循环到最后一列岩性的具体描述时
+                对较长的描述进行分割处理
+                只取第一句话
+            """
+            ds_column_data = []
+            ds_column_data.append(column_data[0])
+            for i in range(1, len(column_data)):
+                ds_str = column_data[i].split('，', 1)
+                ds_column_data.append(ds_str[0])
+            columns_data[column] = ds_column_data
+        else:
+            columns_data[column] = column_data
+        '''
+        columns_data[column] = column_data
+    return columns_data
+
+
+def collect_lithology_scribe(columns_data):
+    """
+    :param columns_data:
+    :return: 合并后的岩性数据
+    :将岩性和具体描述合并到一个列表中
+    """
+    data_lithology_add = []
+    list_k = columns_data['K']
+    # list_l = columns_data['L']
+    for i in range(1, len(list_k) - 1):
+        # str = list_k[i] + ',' + list_l[i]
+        data_lithology_add.append(list_k[i])
+    return data_lithology_add
+
+def main1(path1,path2):
+    print(path1)
+    print(path2)
+    # the main
+    workbook = openpyxl.load_workbook(path1)  # 打开
+    sheet = workbook.active  # 获取默认工作表
+    workbook2 = openpyxl.load_workbook(path2)
+    sheet2 = workbook2.active
+    '''
+        去除无用数据
+    '''
+    # 创建一个新的工作表，用于保存处理后的数据
+    new_workbook = Workbook()
+    new_sheet = new_workbook.active
+    # 遍历原工作表中的每一行
+    for row in sheet.iter_rows(values_only = True):
+        # 检查该行中是否有单元格的值等于-9999
+        if -99999 & -9999 not in row:
+            # 如果没有-9999的值，将该行复制到新工作表
+            new_sheet.append(row)
+
+    # 保存工作簿
+    # 获取文件名（包括文件扩展名）
+    file_name = os.path.basename(path1)
+    # 获取文件名（不包括文件扩展名）
+    file_name_without_extension = os.path.splitext(file_name)[0]
+    new_workbook.save(
+        '*' + file_name_without_extension + '_cleaned_data.xlsx')  # 替换为你要保存的文件路径
+    workbook3 = openpyxl.load_workbook(
+        '*' + file_name_without_extension + '_cleaned_data.xlsx')
+    sheet3 = workbook3.active
+    """
+        读取数据
+        cell_value = sheet['A1'].value
+        print(cell_value)
+    """
+    # 显示多列的数据
+    columns_data = read_ds_sheet2(sheet2)  # 对岩性数据进行处理
+    for column, data in columns_data.items():
+        print(f'Data in Column {column}: {data}')
+
+    # 将岩性和具体描述归并到一起
+    # data_lithology_add = collect_lithology_scribe(columns_data)
+    data_lithology_add = collect_lithology_scribe(columns_data)
+    # print(data_lithology_add)
+
+    # 将岩性标识为数字
+    # data_lithology_add_set = set(data_lithology_add)
+    data_lithology_add_set = set(data_lithology_add)
+    data_lithology_sort = sorted(data_lithology_add_set)  # 转为列表进行排序  保证每次转为数字都是相同的岩性  (set是无序的)
+    print(data_lithology_sort)
+    data_lithology_dict = {}
+    index = 1
+    for element in data_lithology_sort:
+        data_lithology_dict[element] = index
+        index += 1
+    '''
+        追加岩性数据到测井数据中
+    '''
+    # 获取测井数据表最大行数 列数
+    max_row3 = sheet3.max_row
+    max_col3 = sheet3.max_column
+    max_row2 = sheet2.max_row
+    max_col2 = sheet2.max_column
+    # 深度范围数据
+    up_depth = columns_data['D']
+    end_depth = columns_data['E']
+
+    # column_to_write = 9  # 对应列'I'
+    column_to_write = 16  # 对应列'P'
+    index = 2  # 记录测井数据表循环到哪里
+    for i in range(2, max_row2):
+        up = float(up_depth[i - 1])
+        down = float(end_depth[i - 1])
+        # 识别当前岩性对应的标识
+        str = data_lithology_add[i - 2]
+        flag = data_lithology_dict[str]
+        # 从第二行开始，逐行写入数据
+        for j in range(index, max_row3):
+            cell_value = float(sheet3[f'A{j}'].value)
+            if ((cell_value >= up) & (cell_value <= down)):
+                cell = sheet3.cell(row=j, column=column_to_write)
+                cell.value = flag
+            if (cell_value > down):
+                break
+            if (cell_value < up):
+                cell = sheet3.cell(row=j, column=column_to_write)
+                cell.value = 0  # 没有岩性标识
+                continue
+        index = j
+    cell = sheet3.cell(row=1, column=column_to_write)
+    cell.value = 'lithology'
+
+    # 遍历工作表的所有行，检查特定列是否包含0值
+    rows_to_delete = []
+    for row in sheet3.iter_rows():
+        if row[15].value == 0:  #指定列
+            rows_to_delete.append(row[0].row)  # 记录需要删除的行号
+        if row[15].value is None:
+            rows_to_delete.append(row[0].row)  # 记录需要删除的行号
+    # 删除包含0值的行
+    for row_num in sorted(rows_to_delete, reverse=True):  # 逆序删除行，避免行号变化的问题
+        sheet3.delete_rows(row_num)
+
+    #删除Depth列
+    # sheet3.delete_cols(1)
+
+
+    path = '*.xlsx'
+    workbook3.save('*.xlsx')
+    # 关闭工作簿
+    workbook.close()
+    workbook2.close()
+    new_workbook.close()
+    workbook3.close()
+    return path
+
+
+path1 = "*.xlsx"
+path2 = "*.xlsx"
+path = main1(path1,path2)
+print(path)
+
+
+
+# # 用于java调用
+# # 检查命令行参数
+# if len(sys.argv) < 4:
+#     print("Usage: python script.py method_name arg1 arg2")
+#     sys.exit(1)
+#
+# # 获取要执行的方法名和参数
+# method_name = sys.argv[1]
+# arg1 = sys.argv[2]
+# arg2 = sys.argv[3]
+#
+# # 根据方法名调用相应的方法
+# if method_name == "main1":
+#     main1(arg1, arg2)
+# else:
+#     print("Method not found:", method_name)
+
+
+
+
