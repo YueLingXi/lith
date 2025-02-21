@@ -1,0 +1,166 @@
+# -*- coding: utf-8 -*-            
+# @Author : Qing
+# @Time :
+# @Use :  相关性分析
+import matplotlib.patches as mpatches
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from plotly.validators import heatmap
+from tqdm import tqdm
+
+plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+def plot():
+    tips = pd.read_csv('E:/PycharmProjects/DeepLearning/data/FMItest1.csv')
+    # 相关性
+    tips_corr = tips.corr()
+
+    # 创建一个图形
+    plt.figure(figsize=(10, 8))
+    # 绘制相关性热力图
+    # heatmap = sns.heatmap(tips_corr, annot=True, cmap='coolwarm', fmt=".2f",annot_kws={"size": 14})
+    heatmap = sns.heatmap(tips_corr, annot=True, cmap='binary', fmt=".2f", annot_kws={"size": 14, "color": 'black', "weight": "bold"},
+                          cbar=False, alpha=0.0, linewidths=1,linecolor='gray')
+    # fig, ax = plt.subplots(figsize=(12, 10))
+    #
+    # # mask
+    # mask = np.triu(np.ones_like(tips_corr, dtype = np.bool_))
+    # # adjust mask and df
+    # mask = mask[1:, :-1]
+    # corr = tips_corr.iloc[1:, :-1].copy()
+    #
+    # # color map
+    # cmap = sns.diverging_palette(0, 230, 90, 60, as_cmap=True)
+    # # plot heatmap
+    # sns.heatmap(corr, mask=mask, annot=True, fmt=".2f",
+    #            linewidths=5, cmap=cmap, vmin=-1, vmax=1,
+    #            cbar_kws={"shrink": .8}, square=True)
+    #
+    # # ticks
+    # yticks = [i.upper() for i in corr.index]
+    # xticks = [i.upper() for i in corr.column]
+    # plt.yticks(plt.yticks()[0], labels=yticks, rotation=0)
+    # plt.xticks(plt.xticks()[0], labels=xticks)
+    # title
+    title = 'CORRELATION MATRIX\nLogging data sampling\n'
+    plt.xticks(fontsize=17)  # 增加横轴刻度字体大小
+    plt.yticks(fontsize=17)  # 增加纵轴刻度字体大小
+
+    plt.title(title, loc='left', fontsize=18)
+    # 显示图例并设置字体大小
+    # cbar = heatmap.collections[0].colorbar
+    # cbar.ax.tick_params(labelsize=16)
+    # 显示图形
+    plt.show()
+
+# plot()
+
+'''
+    每一个单元格都是透明的并显示相关性数值
+'''
+def plot_fig():
+    tips = pd.read_csv('E:/PycharmProjects/DeepLearning/data/lith_data2.csv')
+    # 相关性
+    tips_corr = tips.corr()
+
+    # 创建一个图形
+    plt.figure(figsize=(10, 8))
+
+    # 绘制透明填充的热力图
+    plt.imshow(tips_corr, cmap='binary', alpha=0.0)
+
+    # 添加文本标签
+    for i in range(len(tips_corr)):
+        for j in range(len(tips_corr)):
+            plt.text(j, i, format(tips_corr.iloc[i, j], ".2f"),
+                     ha="center", va="center", color="black", fontsize=15)
+    # 绘制边框线
+    plt.gca().patch.set_edgecolor('black')
+    plt.gca().patch.set_linewidth(1)
+
+    # 设置坐标轴标签
+    plt.xticks(np.arange(len(tips_corr)), tips_corr.columns, fontsize=16)
+    plt.yticks(np.arange(len(tips_corr)), tips_corr.index, fontsize=16)
+
+    # 添加标题
+    plt.title('CORRELATION MATRIX\n', fontsize=18)
+
+
+
+    # 显示图形
+    plt.show()
+
+# plot_fig()
+
+
+def plot_correlation_with_arcs():
+    """
+    绘制带有数值标注和扇形图的相关性热图。
+
+    参数：
+        data (pd.DataFrame): 包含数值型数据的数据框。
+        title (str): 图的标题。
+    """
+    plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+    tips = pd.read_csv('E:/PycharmProjects/DeepLearning/data/lith_data2.csv')
+    # 计算相关性矩阵
+    corr = tips.corr()
+
+    # 设置图形大小
+    fig, ax = plt.subplots(figsize=(8.5, 7))
+
+    # 设置颜色映射
+    cmap = sns.diverging_palette(240, 10, as_cmap=True)
+    norm = plt.Normalize(vmin=-1, vmax=1)
+
+    # 扇形和边框缩小的半径
+    radius = 0.3
+
+    # 绘制扇形图
+    for i in range(len(corr.columns)):
+        for j in range(len(corr.columns)):
+            if i > j:  # 对角线左下显示数值
+                value = corr.iloc[i, j]
+                ax.text(j+0.5, i+0.5, f"{value:.2f}", ha="center", va="center", fontsize=15, color="black")
+            elif i < j:  # 对角线右上部分绘制扇形
+                value = corr.iloc[i, j]
+                theta1 = 90  # 起始角度
+                theta2 = 90 + value * 180  # 扇形结束角度（根据相关系数大小调整）
+                color = cmap(norm(value))  # 映射颜色
+
+                # 添加扇形
+                wedge = mpatches.Wedge(
+                    (j+0.4, i+0.5), radius, theta1, theta2, facecolor=color, alpha=0.8
+                )
+                ax.add_patch(wedge)
+                # 绘制边框圆形
+                border = mpatches.Circle(
+                    (j+0.4, i+0.5), radius, edgecolor="black", facecolor="none", lw=0.5
+                )
+                ax.add_patch(border)
+
+
+
+    # 添加颜色条
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, orientation="vertical", fraction=0.046, pad=0.04)
+    cbar.set_label("Correlation Coefficient", fontsize=15)
+    cbar.ax.tick_params(labelsize=10)
+
+    # 设置坐标轴
+    ax.set_xticks(np.arange(len(corr.columns)) + 0.5)
+    ax.set_xticklabels(corr.columns, rotation=0, fontsize=15)
+    ax.set_yticks(np.arange(len(corr.columns)) + 0.5)
+    ax.set_yticklabels(corr.columns, fontsize=15)
+    ax.set_xlim(0, len(corr.columns))
+    ax.set_ylim(0, len(corr.columns))
+    ax.invert_yaxis()
+    # 调整显示
+    # plt.title(title, fontsize=16)
+    plt.tight_layout()
+    plt.savefig("E:\\PycharmProjects\\DeepLearning\\img\\correlation_matrix.png", dpi=300)
+    plt.show()
+
+# plot_correlation_with_arcs()
