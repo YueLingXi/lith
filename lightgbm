@@ -132,5 +132,3 @@ print("Cross-validation scores:", scores)
 print("Average accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 '''
 
-# test = pd.read_csv("E:\\PycharmProjects\\DeepLearning\\data\\test_yue245.csv").drop("lithology", axis=1)
-# pre = gbm.predict(test)
