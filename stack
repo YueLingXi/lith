@@ -1,0 +1,38 @@
+import pandas as pd
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+
+df = pd.read_csv("*.csv")
+X = df.drop("lithology", axis=1)
+y = df["lithology"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=32)
+# 3. 定义三个基分类器
+cat_clf = CatBoostClassifier(verbose=0, random_state=42)
+lgb_clf = LGBMClassifier(random_state=42)
+rf_clf  = RandomForestClassifier(random_state=42)
+# 4. 定义堆叠分类器
+# final_estimator 是第二层使用的模型，这里我们以逻辑回归做示例
+stack_clf = StackingClassifier(
+    estimators=[
+        ('cat', cat_clf),
+        ('lgb', lgb_clf),
+        ('rf',  rf_clf)
+    ],
+    final_estimator=LogisticRegression(),
+    passthrough=False,  # True 表示把原始特征与第一层输出一起作为第二层输入
+    cv=5  # 交叉验证拆分数
+)
+
+# 5. 训练
+stack_clf.fit(X_train, y_train)
+
+# 6. 评估
+score = stack_clf.score(X_test, y_test)
+print("StackingClassifier test accuracy: {:.4f}".format(score))
+#保存模型
+import joblib
+joblib.dump(stack_clf, 'E:\\PycharmProjects\\DeepLearning\\model_pkl\\combine_lith_model.pkl')
