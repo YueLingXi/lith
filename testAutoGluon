@@ -1,0 +1,33 @@
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import SimpleImputer
+from autogluon.tabular import TabularDataset, TabularPredictor
+# 读取数据
+data = pd.read_csv("*.csv")
+# 划分训练测试集
+data
+split_size = 0.7
+train_data = data.sample(frac=1).reset_index(drop=True).iloc[:int(len(data)*split_size),:]
+test_data = data.sample(frac=1).reset_index(drop=True).iloc[:int(len(data)*(1 - split_size)),:]
+train_data = TabularDataset(train_data)
+label = "lithology"
+predictor = TabularPredictor(label=label).fit(train_data)
+test_data = TabularDataset(test_data)
+predictor.leaderboard(test_data)
+
+importance = predictor.feature_importance(test_data)
+print(importance)
+
+import matplotlib.pyplot as plt
+
+# 提取特征重要性及其对应的特征名称
+features = importance['Feature']
+scores = importance['Importance']
+
+# 绘制条形图
+plt.figure(figsize=(10, 6))
+plt.barh(features, scores)
+plt.xlabel('Importance')
+plt.title('Feature Importance')
+plt.gca().invert_yaxis()  # 使得重要性较高的特征排在上面
+plt.show()
