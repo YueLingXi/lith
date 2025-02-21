@@ -1,0 +1,169 @@
+import os
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from lightgbm import LGBMRegressor
+from sklearn.decomposition import PCA
+from sklearn.model_selection import cross_val_score, learning_curve
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+# 数据加载到DataFrame中
+path = "*.csv"
+df = pd.read_csv(path)
+plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+
+# 1. 测井参数箱线图
+def plot_logging_boxplot(df):
+    plt.figure(figsize=(12, 6))
+    params = ['AC', 'DEN', 'GR','RT', 'SP', 'POR']
+    data_to_plot = [df[param] for param in params]
+
+    plt.boxplot(data_to_plot, labels=params)
+    plt.title('Distribution box plot of logging parameters',fontweight='bold',fontsize=20)   #测井参数箱线图
+    plt.xlabel('logging parameters',fontsize=15)  #测井参数
+    plt.ylabel('Parameter values',fontsize=15)   #参数值
+    plt.ylim(-10, 700)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    #设置横纵坐标字体大小
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.tick_params(labelsize=15)
+
+    # 保存图像
+    plt.savefig('E:\\PycharmProjects\\BS\\img\\Data_distribution_box_diagram.png', dpi=300)
+
+    plt.show()
+
+# 1. 测井参数箱线图
+# plot_logging_boxplot(df)
+
+
+def plot_logging_boxplot2(df,path):
+    plt.figure(figsize=(8, 6))
+    params = ['AC', 'DEN', 'GR', 'RT', 'SP', 'POR']
+    data_to_plot = [df[param] for param in params]
+    colors = ['skyblue', 'lightgreen', 'lightcoral', 'orange', 'violet', 'gold']
+
+    bplot = plt.boxplot(data_to_plot,
+                        labels=params,
+                        patch_artist=True,
+                        widths=0.3)  # 启用颜色填充
+
+    # 填充颜色
+    for patch, color in zip(bplot['boxes'], colors):
+        patch.set_facecolor(color)
+
+    # plt.title('Distribution box plot of logging parameters', fontweight='bold', fontsize=20)
+    plt.xlabel('logging parameters', fontsize=15)
+    plt.ylabel('Parameter values', fontsize=15)
+    plt.ylim(-10,1000)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.tick_params(labelsize=15)
+    # 获取文件名（包括文件扩展名）
+    file_name = os.path.basename(path)
+    # 获取文件名（不包括文件扩展名）
+    file_name_without_extension = os.path.splitext(file_name)[0]
+    plt.savefig('E:\\PycharmProjects\\DeepLearning\\img\\Data_distribution_box_diagram'+file_name_without_extension+'.png', dpi=300)
+    plt.show()
+# plot_logging_boxplot2(df,path)
+
+
+def plot_radar(df):
+    # plt.rcParams.update({'font.size': 15})
+    features = ['GR', 'AC', 'DEN', 'RT', 'SP', 'POR']
+    lithologies = ['1-mudstone', '2-muddy siltstone', '3-fine sandstone', '4-shale', '5-sedimentary tuff']
+    data = {
+        '1-mudstone': [239.60, 2.540, 161.938, 78.501, 55.952, 3.552],
+        '2-muddy siltstone': [239.589, 2.549, 162.267, 57.577, 56.327, 3.266],
+        '3-fine sandstone': [239.635, 2.538, 159.836, 77.068, 55.300, 3.716 ],
+        '4-shale': [239.794, 2.547, 164.811, 80.789, 59.258, 2.688 ],
+        '5-sedimentary tuff': [241.547, 2.553, 174.097, 83.984, 59.760, 1.396 ]
+    }
+    # 数据标准化
+    df_data = pd.DataFrame(data).T
+    scaler = MinMaxScaler()
+    data_scaled = scaler.fit_transform(df_data)
+    data_scaled = pd.DataFrame(data_scaled, columns=features)
+
+    # 设置参数
+    N = len(features)
+    theta = np.linspace(0.0, 2 * np.pi, N, endpoint=False)
+    width = np.pi / 6 * np.ones(N)
+    # 计算每个岩性的偏移量
+    offsets = np.linspace(-width / 2, width / 2, len(lithologies))
+
+    # 绘图
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='polar')
+
+    colors = ['skyblue', 'lightgreen', 'lightcoral', 'orange', 'violet', 'gold']
+    for idx, lithology in enumerate(lithologies):
+        # values = list(data[lithology])
+        values = data_scaled.iloc[idx].values
+        # ax.bar(theta, values, width=width, bottom=0.0,
+        #        color=colors[idx], alpha=0.6, label=lithology)
+        ax.bar(theta + offsets[idx], values, width=width, bottom=0.0,
+               color=colors[idx], alpha=0.6, label=lithology)
+
+    ax.set_xticks(theta)
+    ax.set_xticklabels(features,fontsize=14)
+
+    plt.legend(loc='upper right', bbox_to_anchor=(0.1,0),fontsize=15)
+    plt.tight_layout()
+    plt.show()
+
+# plot_radar(df)
+
+def plot_pca(df):
+    plt.rcParams.update({'font.size': 15})
+    # 准备数据
+    features = ['GR', 'AC', 'DEN', 'RT', 'SP', 'POR']
+    lithology_labels = ['1-mudstone', '2-muddy siltstone', '3-fine sandstone', '4-shale', '5-sedimentary tuff']
+    X = df[features].values
+    y = df['lithology'].values
+
+    # 标准化
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # PCA降维
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+
+    # 计算贡献率
+    explained_ratio = pca.explained_variance_ratio_
+
+    # 绘图
+    plt.figure(figsize=(8,6))
+    colors = ['skyblue', 'lightgreen', 'lightcoral', 'orange', 'violet', 'gold']
+    markers = ['o', 's', '^', 'D', 'v']  # 不同的标记样式
+
+    for i, lithology in enumerate(np.unique(y)):
+        mask = y == lithology
+        area = 100 * np.ones(sum(mask))  # 统一大小，可以根据需要调整
+        plt.scatter(X_pca[mask, 0], X_pca[mask, 1],
+                    s=area, marker=markers[i],
+                    c=colors[i], label=lithology_labels[i], alpha=0.7)
+
+    plt.xlabel(f'PC1 ({explained_ratio[0]:.2%})', fontsize=15)
+    plt.ylabel(f'PC2 ({explained_ratio[1]:.2%})', fontsize=15)
+    # plt.title('测井数据主成分分析', fontsize=14)
+    plt.legend(fontsize=13)
+    # plt.grid(True, linestyle='--', alpha=0.7)
+    plt.xlim(-2,9)
+    plt.ylim(-2,4)
+    plt.tight_layout()
+
+    plt.savefig('E:\\PycharmProjects\\DeepLearning\\img\\PCA.png',dpi=300)
+
+    plt.show()
+    # 输出各主成分的特征贡献
+    # print("\n特征贡献度:")
+    # for i, (comp, ratio) in enumerate(zip(pca.components_, explained_ratio)):
+    #     print(f"\nPC{i + 1} (解释方差比: {ratio:.2%})")
+    #     for feature, weight in zip(features, comp):
+    #         print(f"{feature}: {weight:.3f}")
+plot_pca(df)
