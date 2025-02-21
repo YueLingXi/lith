@@ -1,0 +1,242 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.metrics import accuracy_score
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+import numpy as np
+
+df = pd.read_csv("*.csv")
+X = df.drop("lithology", axis=1)
+y = df["lithology"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=32)
+
+
+#加载模型
+import joblib
+model_gbm = joblib.load("*.pkl")
+model_cat = joblib.load("*.pkl")
+model_forest = joblib.load("*.pkl")
+
+models = [model_gbm,model_cat,model_forest]
+models_name = ["lightgbm","catboost","randomForest"]
+#直接验证(测试集验证)
+direct_scores = []
+for model in models:
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    direct_scores.append(acc)
+direct_scores
+# model_gbm_param_grid = {'learning_rate': [0.05,0.15,0.1], 'n_estimators': [200,300,350], 'max_depth': [6,8,10]}
+# model_cat_param_grid = {'iterations': [500,600,800],'learning_rate': [0.05,0.1,0.2],'depth': [6,8,10]}
+# model_forest_param_grid = {'n_estimators': [300,400,500],'max_depth': [10,15,20],'min_samples_split': [1,2,4]}
+model_gbm_param_grid = {'learning_rate':0.15, 'n_estimators':350, 'max_depth': 10,'random_state': 32}
+model_cat_param_grid = {'iterations':800,'learning_rate': 0.2,'depth': 8,'random_state': 32}
+model_forest_param_grid = {'n_estimators':400,'max_depth':20,'min_samples_split': 2,'random_state': 32}
+#交叉验证(验证集验证)
+models_cv_info = [
+    ("LightGBM", LGBMClassifier(**model_gbm_param_grid)),
+    ("CatBoost", CatBoostClassifier(**model_cat_param_grid)),
+    ("RandomForest", RandomForestClassifier(**model_forest_param_grid))
+]
+  # K折
+kf = KFold(n_splits=5, shuffle=True, random_state=32)
+cv_means = []
+cv_stds  = []
+all_scores = []
+for (name, model) in models_cv_info:
+    # cross_val_score 会自动fit/predict
+    scores = cross_val_score(model, X, y, cv=kf, scoring='accuracy', n_jobs=-1)
+    cv_means.append(scores.mean())
+    cv_stds.append(scores.std())  
+    all_scores.append(scores)
+plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+# 设置绘图区域和保存图片的背景色为白色
+plt.rcParams['figure.facecolor'] = 'white'   # 整个 figure 的底色
+plt.rcParams['axes.facecolor']   = 'white'   # 子图（坐标系）的底色
+# plt.rcParams['savefig.facecolor'] = 'white'  # 保存图片时的背景色
+# 确保坐标轴线条可见
+plt.rcParams['axes.edgecolor'] = 'black'     # 坐标轴边缘线条颜色
+plt.rcParams['axes.linewidth'] = 1.0         # 坐标轴线条宽度
+plt.rcParams['xtick.color'] = 'black'        # x刻度颜色
+plt.rcParams['ytick.color'] = 'black'        # y刻度颜色
+
+plt.rcParams['font.size'] = 15           # 通用字体大小
+plt.rcParams['axes.titlesize'] = 15      # 坐标轴标题字体大小
+plt.rcParams['axes.labelsize'] = 15      # x、y轴标签的字体大小
+plt.rcParams['xtick.labelsize'] = 13     # x轴刻度字体大小
+plt.rcParams['ytick.labelsize'] = 13     # y轴刻度字体大小
+plt.rcParams['legend.fontsize'] = 12     # 图例文字大小
+plt.rcParams['figure.titlesize'] = 20    # figure 的大标题字体大小
+x = np.arange(len(models_name))  # 0,1,2
+bar_width = 0.35
+plt.figure(figsize=(8,5))
+
+# 直接验证柱子
+bars1 = plt.bar(x - bar_width/2, direct_scores, 
+        width=bar_width, label='Hold-out', alpha=0.7,color="#CAD8E2")
+
+# k折平均柱子（带标准差）
+bars2 = plt.bar(x + bar_width/2, cv_means,
+        width=bar_width, yerr=cv_stds, capsize=5,
+        label='CV Mean', alpha=0.7,color="#EDC6C9")
+# 显示数值标签
+for bar in bars1:
+    plt.text(bar.get_x() + bar.get_width()/2,  # x 位置 (柱子中心)
+             bar.get_height()+0.02,                 # y 位置 (柱子顶部)
+             f'{bar.get_height():.3f}',        # 文本内容 (保留3位小数)
+             ha='center', va='bottom', fontsize=12)
+
+for bar in bars2:
+    plt.text(bar.get_x() + bar.get_width()/2, 
+             bar.get_height()+0.02, 
+             f'{bar.get_height():.3f}', 
+             ha='center', va='bottom', fontsize=12)
+    
+plt.xticks(x, models_name)
+plt.ylabel("Accuracy")
+plt.ylim([0,1])
+plt.title("Comparison: Direct Test vs. K-Fold CV")
+plt.legend(ncol = 2)
+plt.tight_layout()
+plt.savefig("*.png")
+plt.show()
+
+records = []
+for i, scores in enumerate(all_scores):
+    model_name = models_name[i]
+    for fold_idx, acc in enumerate(scores, start=1):
+        records.append({
+            "model": model_name,
+            "fold": fold_idx,
+            "accuracy": acc
+        })
+df = pd.DataFrame(records)
+
+#小提琴图
+
+import seaborn as sns
+sns.set_style("white")  
+sns.despine()
+plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+plt.figure(figsize=(8,5))
+colors = {
+    "lightgbm":"#CAD8E2", 
+    "catboost":"#F2EDED",  
+    "randomForest":"#EDC6C9"
+}
+sns.violinplot(x="model", y="accuracy", data=df, inner="box",  cut=0,width=0.5,palette=colors)
+plt.title("Violin Plot of K-Fold CV Accuracy")
+plt.ylim([0.77,0.88])  # 若准确率为0~1，设置y轴
+plt.ylabel("Accuracy")
+plt.xlabel("Model")
+plt.tight_layout()
+  plt.savefig("*.png")
+plt.show()
+
+#   以“fold”为横轴，对每个模型画一条折线
+plt.rcParams['font.family'] = 'Times New Roman'  # 英文字体设置为Times New Roman
+plt.figure(figsize=(8,5))
+colors=["#CAD8E2", "#F2EDED",  "#EDC6C9"]
+markers = ["o", "s", "^"]
+for model_name,color,marker in zip(models_name,colors,markers):
+    sub_df = df[df["model"] == model_name].sort_values("fold")
+    plt.plot(sub_df["fold"], sub_df["accuracy"], marker=marker, label=model_name,color=color)
+
+plt.title("Accuracy across each fold for each model")
+plt.xlabel("Fold")
+plt.ylabel("Accuracy")
+plt.ylim([0.8,0.9])
+plt.legend()
+plt.tight_layout()
+plt.savefig("*.png")
+plt.show()
+
+fig, axes = plt.subplots(1, len(models), figsize=(15, 5), sharex=True, sharey=True)
+colors = ['#ACC3D5',
+              '#CAD8E2',  # 浅蓝色
+              '#F2EDED',  # 浅灰色
+              '#EDC6C9',  # 浅红色
+              '#E06A73'] 
+for idx, (name, y_prob) in enumerate(probabilities.items()):
+    ax = axes[idx]
+    
+    for class_idx in range(n_classes):  # 遍历 5 个类别
+        sns.histplot(y_prob[:, class_idx], bins=10, kde=True, label=f"Class {class_idx+1}", ax=ax, alpha=0.6,color=colors[class_idx])
+    
+    ax.set_xlabel("Predicted Probability")
+    ax.set_ylabel("Frequency")
+    ax.set_title(f"Predicted Probabilities: {name}")
+    ax.legend()
+    plt.savefig("*.png")
+plt.tight_layout()
+plt.show()
+
+metrics = ["Before Accuracy","Accuracy", "Precision", "Recall", "F1-score"]
+models_name = ["CatBoost", "LightGBM", "RandomForest"]
+scores = {
+    "CatBoost": [0.70,0.84, 0.83, 0.84, 0.83],
+    "LightGBM": [0.75,0.83, 0.82, 0.83, 0.82],
+    "RandomForest": [0.81,0.82, 0.82, 0.82, 0.82],
+}
+
+num_models = len(models_name)
+num_metrics = len(metrics)
+angles = np.linspace(0, 2 * np.pi, num_models, endpoint=False).tolist()
+
+
+# colors = ["#3b528b", "#5ac8c8", "#78c679", "#fde725"]  # 每个指标一个颜色
+colors = ['#ACC3D5',
+              '#CAD8E2',  # 浅蓝色
+              '#F2EDED',  # 浅灰色
+              '#EDC6C9',  # 浅红色
+              '#E06A73'] 
+
+fig, ax = plt.subplots(figsize=(8,8), subplot_kw={'projection': 'polar'})
+bar_width = 2 * np.pi / (num_models * num_metrics)  # 控制柱子宽度
+legend_patches = []  # 用于存储图例的颜色信息
+
+for metric_idx, metric in enumerate(metrics):
+    for model_idx, model in enumerate(models_name):
+        value = scores[model][metric_idx]  # 获取当前模型的当前指标的得分
+        angle = angles[model_idx] + metric_idx * (bar_width)  # 控制柱子位置
+        
+        # 画柱状图
+        bars = ax.bar(angle, value, width=bar_width, bottom=0, color=colors[metric_idx], alpha=0.75)
+
+        # 添加数值标注（稍微向外偏移，以便清晰）
+        ax.text(angle, value + 0.02, f"{value:.2f}", ha='center', va='bottom', fontsize=14, color='black')
+
+    # 添加图例项（只添加一次）
+    legend_patches.append(plt.Line2D([0], [0], color=colors[metric_idx], lw=6, label=metric))
+
+
+ax.set_xticks(angles)
+ax.set_xticklabels(models_name, fontsize=15)  # 设置模型名称
+# 调整刻度文本的外移，防止重叠
+for label, angle in zip(ax.get_xticklabels(), angles):
+    rotation = np.degrees(angle)  # 角度转换为度数
+    if rotation > 90 and rotation < 270:
+        rotation += 180  # 让字体不倒着
+        label.set_horizontalalignment("right")
+    else:
+        label.set_horizontalalignment("left")
+    label.set_rotation(rotation)  # 旋转标签，避免重叠
+
+ax.set_yticklabels([])  # 隐藏径向刻度
+
+
+# plt.legend(handles=legend_patches, loc='upper right', bbox_to_anchor=(1.2, 1.1), fontsize=12, title="Metrics")
+
+# plt.title("Model Performance Comparison (Polar Bar Chart)", fontsize=14)
+  plt.savefig("*.png", bbox_inches="tight", dpi=300)  # 保存主图
+plt.show()
+
+
+
+fig_legend, ax_legend = plt.subplots(figsize=(3, 2))  # 创建小画布用于图例
+ax_legend.axis("off")  # 关闭坐标轴
+legend = ax_legend.legend(handles=legend_patches, loc="center", fontsize=12, title="Metrics", frameon=False)
+      plt.savefig("*.png", bbox_inches="tight", dpi=300)  # 保存图例
+plt.show()
