@@ -58,7 +58,7 @@ print('The accuracy of prediction is:', accuracy_score(y_test, y_pred_best))
 import joblib
 
 #保存模型
-joblib.dump(model,'E:/PycharmProjects/DeepLearning/model_pkl/catboost_model.pkl')
+joblib.dump(model,'*.pkl')
 
 '''
 from sklearn.preprocessing import label_binarize
