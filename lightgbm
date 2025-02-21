@@ -18,7 +18,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_curve, auc
 
 # 读取数据
-data = pd.read_csv("E:\\PycharmProjects\\DeepLearning\\data\\lith_data2.csv")
+data = pd.read_csv("*.csv")
 # 提取特征和标签
 X = data.drop("lithology", axis=1)
 y = data["lithology"]
@@ -105,7 +105,7 @@ for i in range(len(gbm.classes_)):
 
 # 绘制每个类别的ROC曲线
 plt.figure()
-colors = ['blue', 'red', 'green', 'orange','yellow']  # 根据实际情况修改颜色
+colors = ['blue', 'red', 'green', 'orange','yellow'] 
 for i in range(len(gbm.classes_)):
     plt.plot(fpr[i], tpr[i], color=colors[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
 
